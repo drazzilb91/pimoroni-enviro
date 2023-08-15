@@ -140,3 +140,4 @@ rain.txt
 .idea/
 
 config.py
+.vscode/*/**
