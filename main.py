@@ -31,6 +31,9 @@ sleep(0.5)
 import enviro
 import os
 
+from machine import RTC
+print("The RTC timestamp is reading: ")
+print(RTC().datetime())
 
 try:
   # initialise enviro
