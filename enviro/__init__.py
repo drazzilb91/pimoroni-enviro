@@ -10,14 +10,69 @@ from pimoroni_i2c import PimoroniI2C
 i2c = PimoroniI2C(I2C_SDA_PIN, I2C_SCL_PIN, 100000)
 i2c_devices = i2c.scan()
 model = None
-if 56 in i2c_devices: # 56 = colour / light sensor and only present on Indoor
-  model = "indoor"
-elif 35 in i2c_devices: # 35 = ltr-599 on grow & weather
-  pump3_pin = Pin(12, Pin.IN, Pin.PULL_UP)
-  model = "grow" if pump3_pin.value() == False else "weather"    
-  pump3_pin.init(pull=None)
-else:    
-  model = "urban" # otherwise it's urban..
+
+# For troubleshooting which devices are on the i2c bus. Can be removed.
+for device in i2c_devices:  
+  print("Decimal address: ",device," | Hexa address: ",hex(device))
+
+def is_bme280():
+    from breakout_bmp280 import BreakoutBMP280
+    try:
+        BreakoutBMP280(i2c, address=0x77)
+        return True
+    except:
+        return False
+
+def is_bme68x():
+    from breakout_bme68x import BreakoutBME68X
+    try:
+        BreakoutBME68X(i2c, address=0x77)
+        return True
+    except:
+        return False
+
+
+# Board sensors summary:
+# Urban has SPU0410HR5H MEMS micropohne (ADC(0)), PMSA003I PM sensor (i2c: 18 / 0x12 ) and BME280 (i2c: 119 / 0x77
+# Grow has LTR-559 (i2c: 35 / 0x23) and BME280 (i2c: 119 / 0x77)
+# Weather has LTR-559 (i2c: 35 / 0x23) and BME280 (i2c: 119 / 0x77)
+# Plus has LTR-559 (i2c: 35 / 0x23) and BME688 (i2c: 119 / 0x77) and optionally the PMSA003I PM sensor (i2c: 18 / 0x12 )
+# Indoor has BH1745 (i2c: 56 / 0x38) and BME688 (i2c: 119 / 0x77)
+# NOTE: The BME688 can have either an address of 0x76 or 0x77 depending on the SDO value (whether connected to GND vs V_DDIO). The Plus ships with this set at 0x77.
+# 1. **Indoor Board**: If the I2C device `56` (BH1745) is present, it must be an 'Indoor' board.
+# 2. **Grow, Weather, or Plus Boards**: If the I2C device `35` (LTR-559) is present:
+#     - **Grow or Weather**: Check if `119` (BME280/BME688) is present. Determine if it's a 'Grow' or 'Weather' board based on the `pump3_pin` value.
+#     - **Plus**: Check if `18` (PMSA003I PM sensor) is present, which indicates it's a 'Plus' board.
+# 3. **Urban Board**: Otherwise, if `18` (PMSA003I PM sensor) is present without `35` (LTR-559), it's an 'Urban' board.
+# 4. **Unknown**: A fallback "unknown" model is added for any board that doesn't match the known configurations.
+
+# NOTE: The integers in the i2c_devices list are the decimal addresses of the devices on the i2c bus.
+# The decimal addresses are converted to hexa addresses in the print statement above.
+# For example, the decimal address 35 is converted to the hexa address 0x23.
+
+if 56 in i2c_devices:  # BH1745, unique to Indoor
+    model = "indoor"
+elif 35 in i2c_devices:  # LTR-559 common in multiple boards
+  if 119 in i2c_devices:  # BME280 or BME688
+    # Assuming BME688 is distinguishable from BME280 somehow in your code
+    # (Check documentation for a register value or other method to differentiate between BME280 and BME688)
+    if is_bme68x():
+      model = "plus"
+    else:
+      pump3_pin = Pin(12, Pin.IN, Pin.PULL_UP)
+      model = "grow" if pump3_pin.value() == False else "weather"    
+      pump3_pin.init(pull=None)
+  else:
+    model = "unknown"
+elif 119 in i2c_devices:  
+  # Urban has has neither the BH1745 light sensor, nor the LTR-559 light sensor.
+  # Apart from the "Indoor" board, all boards have a weather sensor (either BME280 or BME688) with an I2C address of 119 / 0x77.
+  # By process of elimination, the board must be urban.
+  model = "urban"
+else:
+  # If none of the conditions are met, then there is something wrong. Either a sensor is not being detected, there is a new board, or an edge case.
+  model = "unknown"  # Unknown board type
+
 
 # return the module that implements this board type
 def get_board():
@@ -29,6 +84,8 @@ def get_board():
     import enviro.boards.weather as board
   if model == "urban":
     import enviro.boards.urban as board
+  if model == "plus":
+    import enviro.boards.plus as board
   return board
   
 # set up the activity led
@@ -130,12 +187,13 @@ rtc_alarm_pin = Pin(RTC_ALARM_PIN, Pin.IN, Pin.PULL_DOWN)
 
 # intialise the pcf85063a real time clock chip
 rtc = PCF85063A(i2c)
-i2c.writeto_mem(0x51, 0x00, b'\x00') # ensure rtc is running (this should be default?)
+# i2c.writeto_mem(0x51, 0x00, b'\x00') # ensure rtc is running (this should be default?)
 rtc.enable_timer_interrupt(False)
 
 t = rtc.datetime()
+print(t)
 # BUG ERRNO 22, EINVAL, when date read from RTC is invalid for the pico's RTC.
-RTC().datetime((t[0], t[1], t[2], t[6], t[3], t[4], t[5], 0)) # synch PR2040 rtc too
+# RTC().datetime((t[0], t[1], t[2], t[6], t[3], t[4], t[5], 0)) # synch PR2040 rtc too
 
 # jazz up that console! toot toot!
 print("       ___            ___            ___          ___          ___            ___       ")
@@ -314,19 +372,35 @@ warn_led(WARN_LED_OFF)
 
 # returns the reason the board woke up from deep sleep
 def get_wake_reason():
-  import wakeup
-  
   wake_reason = None
-  if wakeup.get_gpio_state() & (1 << BUTTON_PIN):
-    wake_reason = WAKE_REASON_BUTTON_PRESS
-  elif wakeup.get_gpio_state() & (1 << RTC_ALARM_PIN):
-    wake_reason = WAKE_REASON_RTC_ALARM
-  # TODO Temporarily removing this as false reporting on non-camera boards
-  #elif not external_trigger_pin.value():
-  #  wake_reason = WAKE_REASON_EXTERNAL_TRIGGER
-  elif vbus_present:
-    wake_reason = WAKE_REASON_USB_POWERED
+
+  try:
+    import wakeup
+  
+    if wakeup.get_gpio_state() & (1 << BUTTON_PIN):
+      wake_reason = WAKE_REASON_BUTTON_PRESS
+    elif wakeup.get_gpio_state() & (1 << RTC_ALARM_PIN):
+      wake_reason = WAKE_REASON_RTC_ALARM
+    # TODO Temporarily removing this as false reporting on non-camera boards
+    #elif not external_trigger_pin.value():
+    #  wake_reason = WAKE_REASON_EXTERNAL_TRIGGER
+    elif vbus_present:
+      wake_reason = WAKE_REASON_USB_POWERED  
+  
+  except Exception as wakeReasonException:
+    logging.warn(wakeReasonException)
+    try:
+      if vbus_present:
+        wake_reason = WAKE_REASON_USB_POWERED
+      else:
+        wake_reason = WAKE_REASON_UNKNOWN
+    except Exception as vbusPresentException:
+      logging.warn(vbusPresentException)
+      wake_reason = WAKE_REASON_UNKNOWN
+
+  logging.debug("Returning wake reason as: ", wake_reason)
   return wake_reason
+  
 
 # convert a wake reason into it's name
 def wake_reason_name(wake_reason):
