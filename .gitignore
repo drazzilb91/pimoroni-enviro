@@ -139,8 +139,7 @@ rain.txt
 # Pycharm idea
 .idea/
 
-config.py
 .vscode/*/**
-
-secret.py
+.vscode/Pico-W-Stub/**
 .env
+secret.py
