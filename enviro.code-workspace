@@ -8,5 +8,15 @@
 			"uri": "pico:"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"python.languageServer": "Pylance",
+		"python.analysis.typeCheckingMode": "basic",
+		"micropico.syncFolder": "",
+		"python.analysis.typeshedPaths": [
+			".vscode\\Pico-W-Stub"
+		],
+		"python.analysis.extraPaths": [
+			".vscode\\Pico-W-Stub\\stubs"
+		]
+	}
 }

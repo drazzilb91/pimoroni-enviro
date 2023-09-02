@@ -141,3 +141,6 @@ rain.txt
 
 config.py
 .vscode/*/**
+
+secret.py
+.env

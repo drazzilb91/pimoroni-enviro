@@ -188,8 +188,17 @@ def connect_to_wifi():
     time.sleep(0.5)
 
   seconds_to_connect = int(time.ticks_diff(time.ticks_ms(), start) / 1000)
+  status_dict = {
+      0: "STAT_IDLE",
+      1: "STAT_CONNECTING",
+      -1: "STAT_CONNECT_FAIL",
+      3: "STAT_GOT_IP",
+      -2: "STAT_NO_AP_FOUND",
+      -3: "STAT_WRONG_PASSWORD"
+  }
 
   if wlan.status() != 3:
+    logging.info(f"  - status: {wlan.status()} - {status_dict.get(wlan.status())}")
     logging.error(f"! failed to connect to wireless network {wifi_ssid}")
     return False
 
