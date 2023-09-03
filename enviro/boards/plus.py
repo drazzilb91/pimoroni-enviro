@@ -10,7 +10,7 @@ from breakout_bme68x import BreakoutBME68X
 bme688 = BreakoutBME68X(i2c, address=0x77)
 print("Got BME688 Sensor")
 
-#======================Initialize Pico Graphics======================
+#========Initialize Pico Graphics========
 display = PicoGraphics(display=DISPLAY_ENVIRO_PLUS)
 display.set_backlight(1.0)
 
@@ -43,14 +43,16 @@ def draw_graph(lux_value, prox_value):
 
 # Draw blank graph
 draw_graph(0, 0)
-#======================End of initialize Pico Graphics======================
+#========End of initialize Pico Graphics========
 
-#======================Lights======================
+#=====================Lights=====================
 # NOTE: Removing the color sensor as it is not present on the plus board and adding the light sensor
 # from breakout_bh1745 import BreakoutBH1745
 from breakout_ltr559 import BreakoutLTR559
+# TODO: Consider removing the following 3 lines
 PINS_BREAKOUT_GARDEN = {"sda": 4, "scl": 5}
 PINS_PICO_EXPLORER = {"sda": 20, "scl": 21}
+# TODO: choose one of the i2c imports and remove the other
 i2c2 = PimoroniI2C(**PINS_BREAKOUT_GARDEN)
 ltr559 = BreakoutLTR559(i2c2)
 
@@ -61,36 +63,7 @@ if reading is not None:
   print("Light sensor current readings are, Lux:", reading[BreakoutLTR559.LUX], "Prox:", reading[BreakoutLTR559.PROXIMITY])
 
 # NOTE: Removing the color sensor as it is not present on the plus board
-#======================End Lights======================
-
-# def lux_from_rgbc(r, g, b, c):
-#   if g < 1:
-#       tmp = 0
-#   elif (c / g < 0.160):
-#       tmp = 0.202 * r + 0.766 * g
-#   else:
-#       tmp = 0.159 * r + 0.646 * g
-#   tmp = 0 if tmp < 0 else tmp
-#   integration_time = 160
-#   gain = 1
-#   return round(tmp / gain / integration_time * 160)
-
-# def colour_temperature_from_rgbc(r, g, b, c):
-#   if (g < 1) or (r + g + b < 1):
-#       return 0
-#   r_ratio = r / (r + g + b)
-#   b_ratio = b / (r + g + b)
-#   e = 2.71828
-#   ct = 0
-#   if c / g < 0.160:
-#       b_eff = min(b_ratio * 3.13, 1)
-#       ct = ((1 - b_eff) * 12746 * (e ** (-2.911 * r_ratio))) + (b_eff * 1637 * (e ** (4.865 * b_ratio)))
-#   else:
-#       b_eff = min(b_ratio * 10.67, 1)
-#       ct = ((1 - b_eff) * 16234 * (e ** (-2.781 * r_ratio))) + (b_eff * 1882 * (e ** (4.448 * b_ratio)))
-#   if ct > 10000:
-#       ct = 10000
-#   return round(ct)
+#=====================End Lights=====================
 
 def get_sensor_readings(seconds_since_last):
   data = bme688.read()
