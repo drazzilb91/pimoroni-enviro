@@ -8,6 +8,7 @@ ENVIRO_GROW                   = 2
 ENVIRO_WEATHER                = 3
 ENVIRO_URBAN                  = 4
 ENVIRO_CAMERA                 = 5
+ENVIRO_PLUS                   = 6
 
 # common pins
 HOLD_VSYS_EN_PIN              = 2
@@ -50,7 +51,12 @@ CRITICAL_WATER_PRESSURE = 22064000
 
 # buttons settings for enviro+
 # Format is [pin, invert]
-button_a = [12, True]
-button_b = [13, True]
+BUTTON_A = [12, True]
+BUTTON_B = [13, True]
 BUTTON_X = [14, True]
-button_y = [15, True]
+BUTTON_Y = [15, True]
+
+# change this to adjust temperature compensation
+TEMPERATURE_OFFSET = 3
+
+UPDATE_INTERVAL = 60  # how often to post data, in seconds

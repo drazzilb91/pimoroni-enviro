@@ -12,10 +12,6 @@ i2c = PimoroniI2C(I2C_SDA_PIN, I2C_SCL_PIN, 100000)
 i2c_devices = i2c.scan()
 model = None
 
-# For troubleshooting which devices are on the i2c bus. Can be removed.
-for device in i2c_devices:  
-  print("Decimal address: ",device," | Hexa address: ",hex(device))
-
 def is_bme280():
     from breakout_bmp280 import BreakoutBMP280
     try:
@@ -32,6 +28,8 @@ def is_bme68x():
     except:
         return False
 
+# Enviro+ does not have the PCF85063A RTC chip, so we will run into issue in several of the RTC functions if we don't check for it first
+has_dedicated_rtc = True if 51 in i2c_devices else False
 
 # Board sensors summary:
 # Urban has SPU0410HR5H MEMS micropohne (ADC(0)), PMSA003I PM sensor (i2c: 18 / 0x12 ) and BME280 (i2c: 119 / 0x77
@@ -186,15 +184,24 @@ rtc_alarm_pin = Pin(RTC_ALARM_PIN, Pin.IN, Pin.PULL_DOWN)
 # BUG This should only be set up for Enviro Camera
 # external_trigger_pin = Pin(EXTERNAL_INTERRUPT_PIN, Pin.IN, Pin.PULL_DOWN)
 
-# intialise the pcf85063a real time clock chip
-rtc = PCF85063A(i2c)
-# i2c.writeto_mem(0x51, 0x00, b'\x00') # ensure rtc is running (this should be default?)
-rtc.enable_timer_interrupt(False)
 
-t = rtc.datetime()
-print(t)
+# Enviro+ does not have the PCF85063A RTC chip, so this will fail unless we check for it first
+
+# Initialize the t variable using the RTC.
+t = RTC().datetime()
+
+
+if has_dedicated_rtc:  
+  # intialise the pcf85063a real time clock chip
+  rtc = PCF85063A(i2c)
+  i2c.writeto_mem(0x51, 0x00, b'\x00') # ensure rtc is running (this should be default?)
+  rtc.enable_timer_interrupt(False)
+  t = rtc.datetime()
+  print(t)
+
+
 # BUG ERRNO 22, EINVAL, when date read from RTC is invalid for the pico's RTC.
-# RTC().datetime((t[0], t[1], t[2], t[6], t[3], t[4], t[5], 0)) # synch PR2040 rtc too
+RTC().datetime((t[0], t[1], t[2], t[6], t[3], t[4], t[5], 0)) # synch PR2040 rtc too
 
 # jazz up that console! toot toot!
 print("       ___            ___            ___          ___          ___            ___       ")
@@ -336,14 +343,20 @@ def sync_clock_from_ntp():
     logging.error("  - failed to fetch time from ntp server")
     return False  
 
-  # fixes an issue where sometimes the RTC would not pick up the new time
-  # i2c.writeto_mem(0x51, 0x00, b'\x10') # reset the rtc so we can change the time
-  rtc.datetime(timestamp) # set the time on the rtc chip
-  # i2c.writeto_mem(0x51, 0x00, b'\x00') # ensure rtc is running
-  rtc.enable_timer_interrupt(False)
+  dt = None
+
+  if has_dedicated_rtc:  
+    # fixes an issue where sometimes the RTC would not pick up the new time
+    i2c.writeto_mem(0x51, 0x00, b'\x10') # reset the rtc so we can change the time
+    rtc.datetime(timestamp) # set the time on the rtc chip
+    i2c.writeto_mem(0x51, 0x00, b'\x00') # ensure rtc is running
+    rtc.enable_timer_interrupt(False)
+    dt = rtc.datetime()
+  else:
+    dt = RTC().datetime((t[0], t[1], t[2], t[6], t[3], t[4], t[5], 0))
 
   # read back the RTC time to confirm it was updated successfully
-  dt = rtc.datetime()
+
   if dt != timestamp[0:7]:
     logging.error("  - failed to update rtc")
     if helpers.file_exists("sync_time.txt"):
@@ -361,11 +374,20 @@ def sync_clock_from_ntp():
 # set the state of the warning led (off, on, blinking)
 def warn_led(state):
   if state == WARN_LED_OFF:
-    rtc.set_clock_output(PCF85063A.CLOCK_OUT_OFF)
+    if has_dedicated_rtc:
+      rtc.set_clock_output(PCF85063A.CLOCK_OUT_OFF)
+    else:
+      stop_activity_led()
   elif state == WARN_LED_ON:
-    rtc.set_clock_output(PCF85063A.CLOCK_OUT_1024HZ)
+    if has_dedicated_rtc:
+      rtc.set_clock_output(PCF85063A.CLOCK_OUT_1024HZ)
+    else:
+      activity_led(100)
   elif state == WARN_LED_BLINK:
-    rtc.set_clock_output(PCF85063A.CLOCK_OUT_1HZ)
+    if has_dedicated_rtc:
+      rtc.set_clock_output(PCF85063A.CLOCK_OUT_1HZ)
+    else:
+      pulse_activity_led(1)
     
 # the pcf85063a defaults to 32KHz clock output so need to explicitly turn off
 warn_led(WARN_LED_OFF)
@@ -603,13 +625,18 @@ def sleep(time_override=None):
   else:
     logging.info("> going to sleep")
 
-  # make sure the rtc flags are cleared before going back to sleep
-  logging.debug("  - clearing and disabling previous alarm")
-  rtc.clear_timer_flag() # TODO this was removed from 0.0.8
-  rtc.clear_alarm_flag()
+  if has_dedicated_rtc:
+    # make sure the rtc flags are cleared before going back to sleep
+    logging.debug("  - clearing and disabling previous alarm")
+    rtc.clear_timer_flag() # TODO this was removed from 0.0.8
+    rtc.clear_alarm_flag()
 
-  # set alarm to wake us up for next reading
-  dt = rtc.datetime()
+    # set alarm to wake us up for next reading
+    dt = rtc.datetime()
+  else:
+    # set alarm to wake us up for next reading
+    dt = RTC().datetime()
+  
   hour, minute, second = dt[3:6]
 
   # calculate how many minutes into the day we are
@@ -632,9 +659,10 @@ def sleep(time_override=None):
 
   logging.info(f"  - setting alarm to wake at {hour:02}:{minute:02}{ampm}")
 
+  # TODO: Add implement timer for wakeup without dedicated RTC
   # sleep until next scheduled reading
-  rtc.set_alarm(0, minute, hour)
-  rtc.enable_alarm_interrupt(True)
+  # rtc.set_alarm(0, minute, hour)
+  # rtc.enable_alarm_interrupt(True)
 
   # disable the vsys hold, causing us to turn off
   logging.info("  - shutting down")
@@ -649,28 +677,28 @@ def sleep(time_override=None):
   if phew.remote_mount:
     sys.exit()
 
-  # we'll wait here until the rtc timer triggers and then reset the board
-  logging.debug("  - on usb power (so can't shutdown). Halt and wait for alarm or user reset instead")
-  board = get_board()
-  while not rtc.read_alarm_flag():
-    if hasattr(board, "check_trigger"):
-      board.check_trigger()
+  if has_dedicated_rtc:
+    # we'll wait here until the rtc timer triggers and then reset the board
+    logging.debug("  - on usb power (so can't shutdown). Halt and wait for alarm or user reset instead")
+    board = get_board()
+    while not rtc.read_alarm_flag():
+      if hasattr(board, "check_trigger"):
+        board.check_trigger()
 
-    #time.sleep(0.25)
+      time.sleep(0.25)
 
-    if button_pin.value(): # allow button to force reset
-      break
+      if button_pin.value(): # allow button to force reset
+        break
+  else:
+    button_x = Button(BUTTON_X[0], BUTTON_X[1])
+    while True:
 
-  button_x = Button(BUTTON_X[0], BUTTON_X[1])
+      if button_x.is_pressed:
+        print("Button X pressed")
+        time.sleep(1)
+        break
 
-  while True:
-
-    if button_x.is_pressed:
-      print("Button X pressed")
-      time.sleep(1)
-      break
-
-    time.sleep(0.1)  # this number is how frequently the pico checks for button presses
+      time.sleep(0.1)  # this number is how frequently the pico checks for button presses
 
   logging.debug("  - reset")
 

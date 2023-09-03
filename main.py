@@ -99,7 +99,7 @@ try:
     enviro.save_reading(reading)
 
   # go to sleep until our next scheduled reading
-  enviro.sleep()
+  enviro.sleep(time_override=2)
 
 # handle any unexpected exception that has occurred
 except Exception as exc:
