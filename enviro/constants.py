@@ -47,3 +47,10 @@ UPLOAD_SKIP_FILE = 4
 WATER_VAPOR_SPECIFIC_GAS_CONSTANT = 461.5
 CRITICAL_WATER_TEMPERATURE = 647.096
 CRITICAL_WATER_PRESSURE = 22064000
+
+# buttons settings for enviro+
+# Format is [pin, invert]
+button_a = [12, True]
+button_b = [13, True]
+BUTTON_X = [14, True]
+button_y = [15, True]

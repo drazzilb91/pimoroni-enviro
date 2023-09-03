@@ -2,6 +2,7 @@
 # ===========================================================================
 from enviro.constants import *
 from machine import Pin
+from pimoroni import Button
 hold_vsys_en_pin = Pin(HOLD_VSYS_EN_PIN, Pin.OUT, value=True)
 
 # detect board model based on devices on the i2c bus and pin state
@@ -336,9 +337,9 @@ def sync_clock_from_ntp():
     return False  
 
   # fixes an issue where sometimes the RTC would not pick up the new time
-  i2c.writeto_mem(0x51, 0x00, b'\x10') # reset the rtc so we can change the time
+  # i2c.writeto_mem(0x51, 0x00, b'\x10') # reset the rtc so we can change the time
   rtc.datetime(timestamp) # set the time on the rtc chip
-  i2c.writeto_mem(0x51, 0x00, b'\x00') # ensure rtc is running
+  # i2c.writeto_mem(0x51, 0x00, b'\x00') # ensure rtc is running
   rtc.enable_timer_interrupt(False)
 
   # read back the RTC time to confirm it was updated successfully
@@ -437,7 +438,7 @@ def get_sensor_readings():
     logging.info(f"  - seconds since last reading: {seconds_since_last}")
 
 
-  readings = get_board().get_sensor_readings(seconds_since_last, vbus_present)
+  readings = get_board().get_sensor_readings(seconds_since_last) #, vbus_present)
   # readings["voltage"] = 0.0 # battery_voltage #Temporarily removed until issue is fixed
 
   # write out the last time log
@@ -659,6 +660,17 @@ def sleep(time_override=None):
 
     if button_pin.value(): # allow button to force reset
       break
+
+  button_x = Button(BUTTON_X[0], BUTTON_X[1])
+
+  while True:
+
+    if button_x.is_pressed:
+      print("Button X pressed")
+      time.sleep(1)
+      break
+
+    time.sleep(0.1)  # this number is how frequently the pico checks for button presses
 
   logging.debug("  - reset")
 
