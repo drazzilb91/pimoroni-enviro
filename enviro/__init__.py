@@ -245,7 +245,12 @@ def connect_to_wifi():
   rp2.country("CA") 
   wlan = network.WLAN(network.STA_IF)
   wlan.active(True)
-  wlan.connect(wifi_ssid, wifi_password)
+  try:
+      wlan.connect(wifi_ssid, wifi_password)
+      # wlan.connect(ssid, password)
+  except OSError as error:
+      print(f'error is {error}')
+
 
   start = time.ticks_ms()
   while time.ticks_diff(time.ticks_ms(), start) < 30000:

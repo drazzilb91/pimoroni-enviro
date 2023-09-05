@@ -60,3 +60,10 @@ BUTTON_Y = [15, True]
 TEMPERATURE_OFFSET = 3
 
 UPDATE_INTERVAL = 60  # how often to post data, in seconds
+BRIGHTNESS = 0.8
+
+# change this to adjust pressure based on your altitude
+altitude = 0
+
+# light the LED red if the gas reading is less than 50%
+GAS_ALERT = 0.5
