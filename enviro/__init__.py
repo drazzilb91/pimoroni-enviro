@@ -242,7 +242,7 @@ def connect_to_wifi():
   logging.info("  - ip address: ", ip)
   """
   import rp2
-  rp2.country("GB") 
+  rp2.country("CA") 
   wlan = network.WLAN(network.STA_IF)
   wlan.active(True)
   wlan.connect(wifi_ssid, wifi_password)
@@ -267,7 +267,9 @@ def connect_to_wifi():
     logging.info(f"  - status: {wlan.status()} - {status_dict.get(wlan.status())}")
     logging.error(f"! failed to connect to wireless network {wifi_ssid}")
     return False
-
+  else:
+    logging.debug(f"  - status: {wlan.status()} - {status_dict.get(wlan.status())}")
+  
   # a slow connection time will drain the battery faster and may
   # indicate a poor quality connection
   if seconds_to_connect > 5:
@@ -301,10 +303,17 @@ def low_disk_space():
 
 # returns True if the rtc clock has been set recently 
 def is_clock_set():
-  # is the year on or before 2020?
-  if rtc.datetime()[0] <= 2020:
-    return False
+  if has_dedicated_rtc:
+    # is the year on or before 2020?
+    if rtc.datetime()[0] <= 2020:
+      return False
+  else:
+    print(RTC().datetime()[0])
+    # is the year on or before 2020?
+    if RTC().datetime()[0] <= 2020:
+      return False
 
+  logging.debug("proceeding  is_clock_set()")
   if helpers.file_exists("sync_time.txt"):
     now_str = helpers.datetime_string()
     now = helpers.timestamp(now_str)
@@ -353,8 +362,15 @@ def sync_clock_from_ntp():
     rtc.enable_timer_interrupt(False)
     dt = rtc.datetime()
   else:
-    dt = RTC().datetime((t[0], t[1], t[2], t[6], t[3], t[4], t[5], 0))
-
+    # dt2 = ntp.fetch(synch_with_rtc=True, timeout=30)
+    dt = timestamp[0:7]
+    # RTC().datetime((t[0], t[1], t[2], t[6], t[3], t[4], t[5], 0))
+    # dt = RTC().datetime()
+  # time.sleep(0.5)
+  print(f"Timestamp variable: {timestamp}")
+  print(timestamp[0:7])
+  print(f"dt variable: {dt}")
+  
   # read back the RTC time to confirm it was updated successfully
 
   if dt != timestamp[0:7]:
