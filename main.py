@@ -25,6 +25,7 @@
 
 # Issue #117 where neeed to sleep on startup otherwis emight not boot
 from time import sleep
+import time
 sleep(0.5)
 
 # import enviro firmware, this will trigger provisioning if needed
@@ -45,6 +46,22 @@ try:
     if not enviro.sync_clock_from_ntp():
       # failed to talk to ntp server go back to sleep for another cycle
       enviro.halt("! failed to synchronise clock")  
+
+  # ! TEMPORARY WHILE DEBUGGING
+  dt = RTC().datetime()
+  print("Current time is:",dt)
+  wakeuptime = (dt[0], dt[1], dt[2], dt[3], dt[4], dt[5]+2, dt[6], dt[7])
+  print("Wake up time is:",wakeuptime)
+
+  while dt <= wakeuptime:
+    print("Current time is:",dt)
+    print("Wake up time is:",wakeuptime)
+    RTC().datetime()
+    print("Sleeping for 0.5 seconds")
+    print("--------------------------")
+    time.sleep(0.5)  # this number is how frequently the pico checks for button presses)
+    dt = RTC().datetime()
+  # ! END TEMPORARY WHILE DEBUGGING 
 
   # check disk space...
   if enviro.low_disk_space():

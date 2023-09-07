@@ -1,0 +1,101 @@
+It sounds like it would be good for me to setup all the parameters to my liking right now, in the initial stages, so that all incoming data will be clean and informative go-forward.
+
+Help me setup the data that I am going to send.  In this case, all information is going to be sent from a device named "enviroplus". The device sends sensor data from the following sensors:
+
+
+device:
+  name: enviroplus
+  manufacturer: Pimoroni
+  model: Pico Enviro+
+  sensors:
+    - name: 4-in-1 temperature, pressure, humidity and gas sensor
+      model: BME688
+      manufacturer: Bosch Sensortec
+      interface:
+        - type: i2c
+        - address: 0x77
+      measurements:
+        - name: temperature
+          unit: degrees_celsius
+        - name: pressure
+          unit: pascal
+        - name: relative_humidity
+          unit: percent
+        - name: gas_resistance
+          unit: ohm
+        - name: status
+          unit: string
+        - name: gas_index
+          unit: index
+        - name: meas_index
+          unit: index
+      constants:
+        - name: temperature_offset
+          unit: degrees_celsius
+        - name: humidity_offset
+          value: percent
+        - name: altitude
+          unit: meter
+      calculated_measurements:
+        - name: corrected_pressure
+          unit: hectopascal
+        - name: corrected_temperature
+          unit: degrees_celsius
+        - name: corrected_humidity
+          unit: percent  
+        - name: dew_point
+          unit: degrees_celsius
+        - name: aqi
+          unit: index
+    - name: Light Sensor
+      model: LTR-559ALS-01
+      manufacturer: LITE-ON Technology Corporation
+      interface:
+        - type: i2c
+        - address: 0x23
+      measurements:
+        - name: light
+          unit: lux
+        - name: proximity
+          unit: millimeter
+    - name: MEMS Microphone
+      model: SPU0410HR5H-PB
+      manufacturer: Knowles
+      interface:
+        - type: ADC
+        - pin: 16
+      measurements:
+        - sound
+    - name: PMS5003 Particulate Matter Sensor
+      model: PMS5003
+      manufacturer: Plantower
+      interface:
+        - type: UART
+        - baudrate: 9600
+        - tx_pin: 8
+        - rx_pin: 9
+      measurements:
+        - name: pm1.0
+          unit: microgram_per_cubic_meter
+        - name: pm2.5
+          unit: microgram_per_cubic_meter
+        - name: pm10
+          unit: microgram_per_cubic_meter
+        - name: pm1.0_atm
+          unit: microgram_per_cubic_meter
+        - name: pm2.5_atm
+          unit: microgram_per_cubic_meter
+        - name: pm10_atm
+          unit: microgram_per_cubic_meter
+        - name: gt0.3um
+          unit: number_per_cubic_centimeter
+        - name: gt0.5um
+          unit: number_per_cubic_centimeter
+        - name: gt1.0um
+          unit: number_per_cubic_centimeter
+        - name: gt2.5um
+          unit: number_per_cubic_centimeter
+        - name: gt5.0um
+          unit: number_per_cubic_centimeter
+        - name: gt10um
+          unit: number_per_cubic_centimeter

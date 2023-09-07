@@ -684,6 +684,9 @@ def sleep(time_override=None):
   # sleep until next scheduled reading
   # rtc.set_alarm(0, minute, hour)
   # rtc.enable_alarm_interrupt(True)
+  wakeuptime = dt + (0, 0, 0, 0, 0, time_override, 0, 0)
+  
+
 
   # disable the vsys hold, causing us to turn off
   logging.info("  - shutting down")
@@ -712,13 +715,12 @@ def sleep(time_override=None):
         break
   else:
     button_x = Button(BUTTON_X[0], BUTTON_X[1])
-    while True:
-
+    while RTC().datetime() <= wakeuptime:
+      
       if button_x.is_pressed:
         print("Button X pressed")
         time.sleep(1)
         break
-
       time.sleep(0.1)  # this number is how frequently the pico checks for button presses
 
   logging.debug("  - reset")

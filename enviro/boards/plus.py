@@ -104,7 +104,7 @@ def describe_light(lux):
         description = "dim"
     elif 100 <= lux < 500:
         description = "light"
-    elif lux >= 500:
+    else: # Replaced "elif lux >= 500" with "else" as it is equivalent but also covers any case not thought of and clears an error in returning a description that is possibly undefined
         description = "bright"
     return description
 
@@ -188,16 +188,16 @@ PINS_PICO_EXPLORER = {"sda": 20, "scl": 21}
 i2c2 = PimoroniI2C(**PINS_BREAKOUT_GARDEN)
 ltr559 = BreakoutLTR559(i2c2)
 
-print("Found LTR559. Part ID: 0x", "{:02x}".format(ltr559.part_id()), sep="")
-time.sleep(0.25)
-reading = ltr559.get_reading()
-if reading is not None:
-    print(
-        "Light sensor current readings are, Lux:",
-        reading[BreakoutLTR559.LUX],
-        "Prox:",
-        reading[BreakoutLTR559.PROXIMITY],
-    )
+# print("Found LTR559. Part ID: 0x", "{:02x}".format(ltr559.part_id()), sep="")
+# time.sleep(0.25)
+# reading = ltr559.get_reading()
+# if reading is not None:
+#     print(
+#         "Light sensor current readings are, Lux:",
+#         reading[BreakoutLTR559.LUX],
+#         "Prox:",
+#         reading[BreakoutLTR559.PROXIMITY],
+#     )
 
 # NOTE: Removing the color sensor as it is not present on the plus board
 # =====================End Lights=====================
@@ -290,9 +290,9 @@ def get_sensor_readings(seconds_since_last):
     data = bme688.read()
 
     # the gas sensor gives a few weird readings to start, lets discard them
-    temperature, pressure, humidity, gas, status, _, _ = bme688.read()
+    temperature, pressure, humidity, gas, status, gas_index, meas_index = bme688.read()
     time.sleep(0.5)
-    temperature, pressure, humidity, gas, status, _, _ = bme688.read()
+    temperature, pressure, humidity, gas, status, gas_index, meas_index = bme688.read()
     time.sleep(0.5)
 
     temperature = round(data[0], 2)
@@ -319,7 +319,8 @@ def get_sensor_readings(seconds_since_last):
             "aqi": aqi,
             "luminance": luminance,
             "proximity": proximity,
-
+            "gas_index": gas_index,
+            "meas_index": meas_index
         }
     )
 
