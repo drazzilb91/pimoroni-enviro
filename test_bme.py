@@ -4,8 +4,8 @@ I2C_SDA_PIN = 4
 I2C_SCL_PIN = 5
 
 
-# from machine import Pin
-# hold_vsys_en_pin = Pin(HOLD_VSYS_EN_PIN, Pin.OUT, value=True)
+from machine import Pin
+hold_vsys_en_pin = Pin(HOLD_VSYS_EN_PIN, Pin.OUT, value=True)
 
 from pimoroni_i2c import PimoroniI2C
 
