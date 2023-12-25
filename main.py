@@ -27,6 +27,8 @@
 from time import sleep
 sleep(0.5)
 
+# import env_getter
+
 # import enviro firmware, this will trigger provisioning if needed
 import enviro
 import os
@@ -38,6 +40,8 @@ print(RTC().datetime())
 try:
   # initialise enviro
   enviro.startup()
+
+  chirp = enviro.boards.grow.drip_noise()
 
   # if the clock isn't set...
   if not enviro.is_clock_set():
