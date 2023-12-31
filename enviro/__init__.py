@@ -2,6 +2,7 @@
 # ===========================================================================
 from enviro.constants import *
 from machine import Pin
+from pimoroni import Button
 hold_vsys_en_pin = Pin(HOLD_VSYS_EN_PIN, Pin.OUT, value=True)
 
 # detect board model based on devices on the i2c bus and pin state
@@ -10,14 +11,67 @@ from pimoroni_i2c import PimoroniI2C
 i2c = PimoroniI2C(I2C_SDA_PIN, I2C_SCL_PIN, 100000)
 i2c_devices = i2c.scan()
 model = None
-if 56 in i2c_devices: # 56 = colour / light sensor and only present on Indoor
-  model = "indoor"
-elif 35 in i2c_devices: # 35 = ltr-599 on grow & weather
-  pump3_pin = Pin(12, Pin.IN, Pin.PULL_UP)
-  model = "grow" if pump3_pin.value() == False else "weather"    
-  pump3_pin.init(pull=None)
-else:    
-  model = "urban" # otherwise it's urban..
+
+def is_bme280():
+    from breakout_bmp280 import BreakoutBMP280
+    try:
+        BreakoutBMP280(i2c, address=0x77)
+        return True
+    except:
+        return False
+
+def is_bme68x():
+    from breakout_bme68x import BreakoutBME68X
+    try:
+        BreakoutBME68X(i2c, address=0x77)
+        return True
+    except:
+        return False
+
+# Enviro+ does not have the PCF85063A RTC chip, so we will run into issue in several of the RTC functions if we don't check for it first
+has_dedicated_rtc = True if 51 in i2c_devices else False
+
+# Board sensors summary:
+# Urban has SPU0410HR5H MEMS micropohne (ADC(0)), PMSA003I PM sensor (i2c: 18 / 0x12 ) and BME280 (i2c: 119 / 0x77
+# Grow has LTR-559 (i2c: 35 / 0x23) and BME280 (i2c: 119 / 0x77)
+# Weather has LTR-559 (i2c: 35 / 0x23) and BME280 (i2c: 119 / 0x77)
+# Plus has LTR-559 (i2c: 35 / 0x23) and BME688 (i2c: 119 / 0x77) and optionally the PMSA003I PM sensor (i2c: 18 / 0x12 )
+# Indoor has BH1745 (i2c: 56 / 0x38) and BME688 (i2c: 119 / 0x77)
+# NOTE: The BME688 can have either an address of 0x76 or 0x77 depending on the SDO value (whether connected to GND vs V_DDIO). The Plus ships with this set at 0x77.
+# 1. **Indoor Board**: If the I2C device `56` (BH1745) is present, it must be an 'Indoor' board.
+# 2. **Grow, Weather, or Plus Boards**: If the I2C device `35` (LTR-559) is present:
+#     - **Grow or Weather**: Check if `119` (BME280/BME688) is present. Determine if it's a 'Grow' or 'Weather' board based on the `pump3_pin` value.
+#     - **Plus**: Check if `18` (PMSA003I PM sensor) is present, which indicates it's a 'Plus' board.
+# 3. **Urban Board**: Otherwise, if `18` (PMSA003I PM sensor) is present without `35` (LTR-559), it's an 'Urban' board.
+# 4. **Unknown**: A fallback "unknown" model is added for any board that doesn't match the known configurations.
+
+# NOTE: The integers in the i2c_devices list are the decimal addresses of the devices on the i2c bus.
+# The decimal addresses are converted to hexa addresses in the print statement above.
+# For example, the decimal address 35 is converted to the hexa address 0x23.
+
+if 56 in i2c_devices:  # BH1745, unique to Indoor
+    model = "indoor"
+elif 35 in i2c_devices:  # LTR-559 common in multiple boards
+  if 119 in i2c_devices:  # BME280 or BME688
+    # Assuming BME688 is distinguishable from BME280 somehow in your code
+    # (Check documentation for a register value or other method to differentiate between BME280 and BME688)
+    if is_bme68x():
+      model = "plus"
+    else:
+      pump3_pin = Pin(12, Pin.IN, Pin.PULL_UP)
+      model = "grow" if pump3_pin.value() == False else "weather"    
+      pump3_pin.init(pull=None)
+  else:
+    model = "unknown"
+elif 119 in i2c_devices:  
+  # Urban has has neither the BH1745 light sensor, nor the LTR-559 light sensor.
+  # Apart from the "Indoor" board, all boards have a weather sensor (either BME280 or BME688) with an I2C address of 119 / 0x77.
+  # By process of elimination, the board must be urban.
+  model = "urban"
+else:
+  # If none of the conditions are met, then there is something wrong. Either a sensor is not being detected, there is a new board, or an edge case.
+  model = "unknown"  # Unknown board type
+
 
 # return the module that implements this board type
 def get_board():
@@ -29,6 +83,8 @@ def get_board():
     import enviro.boards.weather as board
   if model == "urban":
     import enviro.boards.urban as board
+  if model == "plus":
+    import enviro.boards.plus as board
   return board
   
 # set up the activity led
@@ -128,12 +184,22 @@ rtc_alarm_pin = Pin(RTC_ALARM_PIN, Pin.IN, Pin.PULL_DOWN)
 # BUG This should only be set up for Enviro Camera
 # external_trigger_pin = Pin(EXTERNAL_INTERRUPT_PIN, Pin.IN, Pin.PULL_DOWN)
 
-# intialise the pcf85063a real time clock chip
-rtc = PCF85063A(i2c)
-i2c.writeto_mem(0x51, 0x00, b'\x00') # ensure rtc is running (this should be default?)
-rtc.enable_timer_interrupt(False)
 
-t = rtc.datetime()
+# Enviro+ does not have the PCF85063A RTC chip, so this will fail unless we check for it first
+
+# Initialize the t variable using the RTC.
+t = RTC().datetime()
+
+
+if has_dedicated_rtc:  
+  # intialise the pcf85063a real time clock chip
+  rtc = PCF85063A(i2c)
+  i2c.writeto_mem(0x51, 0x00, b'\x00') # ensure rtc is running (this should be default?)
+  rtc.enable_timer_interrupt(False)
+  t = rtc.datetime()
+  print(t)
+
+
 # BUG ERRNO 22, EINVAL, when date read from RTC is invalid for the pico's RTC.
 RTC().datetime((t[0], t[1], t[2], t[6], t[3], t[4], t[5], 0)) # synch PR2040 rtc too
 
@@ -176,10 +242,15 @@ def connect_to_wifi():
   logging.info("  - ip address: ", ip)
   """
   import rp2
-  rp2.country("GB") 
+  rp2.country("CA") 
   wlan = network.WLAN(network.STA_IF)
   wlan.active(True)
-  wlan.connect(wifi_ssid, wifi_password)
+  try:
+      wlan.connect(wifi_ssid, wifi_password)
+      # wlan.connect(ssid, password)
+  except OSError as error:
+      print(f'error is {error}')
+
 
   start = time.ticks_ms()
   while time.ticks_diff(time.ticks_ms(), start) < 30000:
@@ -201,7 +272,9 @@ def connect_to_wifi():
     logging.info(f"  - status: {wlan.status()} - {status_dict.get(wlan.status())}")
     logging.error(f"! failed to connect to wireless network {wifi_ssid}")
     return False
-
+  else:
+    logging.debug(f"  - status: {wlan.status()} - {status_dict.get(wlan.status())}")
+  
   # a slow connection time will drain the battery faster and may
   # indicate a poor quality connection
   if seconds_to_connect > 5:
@@ -235,10 +308,17 @@ def low_disk_space():
 
 # returns True if the rtc clock has been set recently 
 def is_clock_set():
-  # is the year on or before 2020?
-  if rtc.datetime()[0] <= 2020:
-    return False
+  if has_dedicated_rtc:
+    # is the year on or before 2020?
+    if rtc.datetime()[0] <= 2020:
+      return False
+  else:
+    print(RTC().datetime()[0])
+    # is the year on or before 2020?
+    if RTC().datetime()[0] <= 2020:
+      return False
 
+  logging.debug("proceeding  is_clock_set()")
   if helpers.file_exists("sync_time.txt"):
     now_str = helpers.datetime_string()
     now = helpers.timestamp(now_str)
@@ -277,14 +357,27 @@ def sync_clock_from_ntp():
     logging.error("  - failed to fetch time from ntp server")
     return False  
 
-  # fixes an issue where sometimes the RTC would not pick up the new time
-  i2c.writeto_mem(0x51, 0x00, b'\x10') # reset the rtc so we can change the time
-  rtc.datetime(timestamp) # set the time on the rtc chip
-  i2c.writeto_mem(0x51, 0x00, b'\x00') # ensure rtc is running
-  rtc.enable_timer_interrupt(False)
+  dt = None
 
+  if has_dedicated_rtc:  
+    # fixes an issue where sometimes the RTC would not pick up the new time
+    i2c.writeto_mem(0x51, 0x00, b'\x10') # reset the rtc so we can change the time
+    rtc.datetime(timestamp) # set the time on the rtc chip
+    i2c.writeto_mem(0x51, 0x00, b'\x00') # ensure rtc is running
+    rtc.enable_timer_interrupt(False)
+    dt = rtc.datetime()
+  else:
+    # dt2 = ntp.fetch(synch_with_rtc=True, timeout=30)
+    dt = timestamp[0:7]
+    # RTC().datetime((t[0], t[1], t[2], t[6], t[3], t[4], t[5], 0))
+    # dt = RTC().datetime()
+  # time.sleep(0.5)
+  print(f"Timestamp variable: {timestamp}")
+  print(timestamp[0:7])
+  print(f"dt variable: {dt}")
+  
   # read back the RTC time to confirm it was updated successfully
-  dt = rtc.datetime()
+
   if dt != timestamp[0:7]:
     logging.error("  - failed to update rtc")
     if helpers.file_exists("sync_time.txt"):
@@ -302,11 +395,20 @@ def sync_clock_from_ntp():
 # set the state of the warning led (off, on, blinking)
 def warn_led(state):
   if state == WARN_LED_OFF:
-    rtc.set_clock_output(PCF85063A.CLOCK_OUT_OFF)
+    if has_dedicated_rtc:
+      rtc.set_clock_output(PCF85063A.CLOCK_OUT_OFF)
+    else:
+      stop_activity_led()
   elif state == WARN_LED_ON:
-    rtc.set_clock_output(PCF85063A.CLOCK_OUT_1024HZ)
+    if has_dedicated_rtc:
+      rtc.set_clock_output(PCF85063A.CLOCK_OUT_1024HZ)
+    else:
+      activity_led(100)
   elif state == WARN_LED_BLINK:
-    rtc.set_clock_output(PCF85063A.CLOCK_OUT_1HZ)
+    if has_dedicated_rtc:
+      rtc.set_clock_output(PCF85063A.CLOCK_OUT_1HZ)
+    else:
+      pulse_activity_led(1)
     
 # the pcf85063a defaults to 32KHz clock output so need to explicitly turn off
 warn_led(WARN_LED_OFF)
@@ -314,19 +416,35 @@ warn_led(WARN_LED_OFF)
 
 # returns the reason the board woke up from deep sleep
 def get_wake_reason():
-  import wakeup
-  
   wake_reason = None
-  if wakeup.get_gpio_state() & (1 << BUTTON_PIN):
-    wake_reason = WAKE_REASON_BUTTON_PRESS
-  elif wakeup.get_gpio_state() & (1 << RTC_ALARM_PIN):
-    wake_reason = WAKE_REASON_RTC_ALARM
-  # TODO Temporarily removing this as false reporting on non-camera boards
-  #elif not external_trigger_pin.value():
-  #  wake_reason = WAKE_REASON_EXTERNAL_TRIGGER
-  elif vbus_present:
-    wake_reason = WAKE_REASON_USB_POWERED
+
+  try:
+    import wakeup
+  
+    if wakeup.get_gpio_state() & (1 << BUTTON_PIN):
+      wake_reason = WAKE_REASON_BUTTON_PRESS
+    elif wakeup.get_gpio_state() & (1 << RTC_ALARM_PIN):
+      wake_reason = WAKE_REASON_RTC_ALARM
+    # TODO Temporarily removing this as false reporting on non-camera boards
+    #elif not external_trigger_pin.value():
+    #  wake_reason = WAKE_REASON_EXTERNAL_TRIGGER
+    elif vbus_present:
+      wake_reason = WAKE_REASON_USB_POWERED  
+  
+  except Exception as wakeReasonException:
+    logging.warn(wakeReasonException)
+    try:
+      if vbus_present:
+        wake_reason = WAKE_REASON_USB_POWERED
+      else:
+        wake_reason = WAKE_REASON_UNKNOWN
+    except Exception as vbusPresentException:
+      logging.warn(vbusPresentException)
+      wake_reason = WAKE_REASON_UNKNOWN
+
+  logging.debug("Returning wake reason as: ", wake_reason)
   return wake_reason
+  
 
 # convert a wake reason into it's name
 def wake_reason_name(wake_reason):
@@ -363,7 +481,7 @@ def get_sensor_readings():
     logging.info(f"  - seconds since last reading: {seconds_since_last}")
 
 
-  readings = get_board().get_sensor_readings(seconds_since_last, vbus_present)
+  readings = get_board().get_sensor_readings(seconds_since_last) #, vbus_present)
   # readings["voltage"] = 0.0 # battery_voltage #Temporarily removed until issue is fixed
 
   # write out the last time log
@@ -528,13 +646,18 @@ def sleep(time_override=None):
   else:
     logging.info("> going to sleep")
 
-  # make sure the rtc flags are cleared before going back to sleep
-  logging.debug("  - clearing and disabling previous alarm")
-  rtc.clear_timer_flag() # TODO this was removed from 0.0.8
-  rtc.clear_alarm_flag()
+  if has_dedicated_rtc:
+    # make sure the rtc flags are cleared before going back to sleep
+    logging.debug("  - clearing and disabling previous alarm")
+    rtc.clear_timer_flag() # TODO this was removed from 0.0.8
+    rtc.clear_alarm_flag()
 
-  # set alarm to wake us up for next reading
-  dt = rtc.datetime()
+    # set alarm to wake us up for next reading
+    dt = rtc.datetime()
+  else:
+    # set alarm to wake us up for next reading
+    dt = RTC().datetime()
+  
   hour, minute, second = dt[3:6]
 
   # calculate how many minutes into the day we are
@@ -557,9 +680,13 @@ def sleep(time_override=None):
 
   logging.info(f"  - setting alarm to wake at {hour:02}:{minute:02}{ampm}")
 
+  # TODO: Add implement timer for wakeup without dedicated RTC
   # sleep until next scheduled reading
-  rtc.set_alarm(0, minute, hour)
-  rtc.enable_alarm_interrupt(True)
+  # rtc.set_alarm(0, minute, hour)
+  # rtc.enable_alarm_interrupt(True)
+  wakeuptime = dt + (0, 0, 0, 0, 0, time_override, 0, 0)
+  
+
 
   # disable the vsys hold, causing us to turn off
   logging.info("  - shutting down")
@@ -574,17 +701,27 @@ def sleep(time_override=None):
   if phew.remote_mount:
     sys.exit()
 
-  # we'll wait here until the rtc timer triggers and then reset the board
-  logging.debug("  - on usb power (so can't shutdown). Halt and wait for alarm or user reset instead")
-  board = get_board()
-  while not rtc.read_alarm_flag():
-    if hasattr(board, "check_trigger"):
-      board.check_trigger()
+  if has_dedicated_rtc:
+    # we'll wait here until the rtc timer triggers and then reset the board
+    logging.debug("  - on usb power (so can't shutdown). Halt and wait for alarm or user reset instead")
+    board = get_board()
+    while not rtc.read_alarm_flag():
+      if hasattr(board, "check_trigger"):
+        board.check_trigger()
 
-    #time.sleep(0.25)
+      time.sleep(0.25)
 
-    if button_pin.value(): # allow button to force reset
-      break
+      if button_pin.value(): # allow button to force reset
+        break
+  # else:
+  #   button_x = Button(BUTTON_X[0], BUTTON_X[1])
+  #   while RTC().datetime() <= wakeuptime:
+      
+  #     if button_x.is_pressed:
+  #       print("Button X pressed")
+  #       time.sleep(1)
+  #       break
+  #     time.sleep(0.1)  # this number is how frequently the pico checks for button presses
 
   logging.debug("  - reset")
 
