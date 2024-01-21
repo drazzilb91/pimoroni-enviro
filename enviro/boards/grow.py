@@ -74,6 +74,11 @@ def drip_noise():
 
 def water(moisture_levels, targets = [0, 0, 0]):
 
+  watered = {
+    "A": {"status": False, "duration": 0},
+    "B": {"status": False, "duration": 0},
+    "C": {"status": False, "duration": 0}
+  }
 
   for i in range(0, 3):
     if moisture_levels[i] < targets[i]:
@@ -87,11 +92,15 @@ def water(moisture_levels, targets = [0, 0, 0]):
         pump_pins[i].value(1)
         time.sleep(duration)
         pump_pins[i].value(0)
+        watered[CHANNEL_NAMES[i]]["status"] = True
+        watered[CHANNEL_NAMES[i]]["duration"] = duration
       else:
         logging.info(f"  - playing beep")
         for j in range(0, i + 1):
           drip_noise()
         time.sleep(0.5)
+
+  return watered
 
 def get_sensor_readings(seconds_since_last):
   # bme280 returns the register contents immediately and then starts a new reading
@@ -127,6 +136,13 @@ def get_sensor_readings(seconds_since_last):
     "moisture_target_a": config.moisture_target_a,
     "moisture_target_b": config.moisture_target_b,
     "moisture_target_c": config.moisture_target_c,
+    "watered_a": False,
+    "watered_b": False,
+    "watered_c": False,
+    "watered_duration_a": 0,
+    "watered_duration_b": 0,
+    "watered_duration_c": 0,
+    "seconds_since_last": seconds_since_last,
   })
 
   return reading_payload
