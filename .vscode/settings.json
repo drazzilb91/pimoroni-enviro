@@ -2,12 +2,15 @@
     "python.linting.enabled": true,
     "python.languageServer": "Pylance",
     "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportMissingModuleSource": "none"
+    },
     "micropico.syncFolder": "",
+    "micropico.openOnStart": true,
     "python.analysis.typeshedPaths": [
         ".vscode\\Pico-W-Stub"
     ],
     "python.analysis.extraPaths": [
-        ".vscode\\Pico-W-Stub\\stubs"
-    ],
-    "micropico.openOnStart": true
+        ".vscode\\Pico-W-Stub"
+    ]
 }

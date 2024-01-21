@@ -2,7 +2,7 @@
 	"folders": [
 		{
 			"path": "."
-		},
+},
 		{
 			"name": "Pico (W) Remote Workspace",
 			"uri": "pico:"
@@ -16,7 +16,24 @@
 			".vscode\\Pico-W-Stub"
 		],
 		"python.analysis.extraPaths": [
-			".vscode\\Pico-W-Stub\\stubs"
+			".vscode\\Pico-W-Stub",
+			"A:\\Programming\\Projects\\pimoroni-enviro\\.vscode\\Pico-W-Stub"
+		],
+		"python.autoComplete.extraPaths": [
+			".\\.vscode\\Pico-W-Stub", // Add this line
+			"A:\\Programming\\Projects\\pimoroni-enviro\\.vscode\\Pico-W-Stub"
+		],
+		"micropico.openOnStart": false,
+		"pylint.enabled": false,
+		"python.analysis.include": ["A:\\Programming\\Projects\\pimoroni-enviro\\.vscode\\Pico-W-Stub"]
+	},
+	"extensions": {
+		"recommendations": [
+			"ms-python.python",
+			"visualstudioexptteam.vscodeintellicode",
+			"ms-python.vscode-pylance",
+			"paulober.pico-w-go",
+			"ms-python.mypy-type-checker"
 		]
 	}
 }

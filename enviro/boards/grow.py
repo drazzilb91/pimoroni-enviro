@@ -112,7 +112,8 @@ def get_sensor_readings(seconds_since_last):
   water(moisture_levels) # run pumps if needed
 
   from ucollections import OrderedDict
-  return OrderedDict({
+
+  reading_payload = OrderedDict({
     "temperature": round(bme280_data[0], 2),
     "humidity": round(bme280_data[2], 2),
     "pressure": round(bme280_data[1] / 100.0, 2),
@@ -121,6 +122,8 @@ def get_sensor_readings(seconds_since_last):
     "moisture_b": round(moisture_levels[1], 2),
     "moisture_c": round(moisture_levels[2], 2)
   })
+
+  return reading_payload
   
 def play_tone(frequency = None):
   if frequency:
