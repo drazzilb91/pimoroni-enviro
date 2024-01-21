@@ -72,7 +72,7 @@ def drip_noise():
       time.sleep(0.02)
   piezo_pwm.duty_u16(0)
 
-def water(moisture_levels, targets = [0, 0, 0]):
+def water(moisture_levels, targets = [0, 0, 0], auto_water = False):
 
   watered = {
     "A": {"status": False, "duration": 0},
@@ -87,7 +87,7 @@ def water(moisture_levels, targets = [0, 0, 0]):
 
       logging.info(f"> sensor {CHANNEL_NAMES[i]} below moisture target {targets[i]} (currently at {int(moisture_levels[i])}).")
 
-      if config.auto_water:
+      if auto_water:
         logging.info(f"  - running pump {CHANNEL_NAMES[i]} for {duration} second(s)")
         pump_pins[i].value(1)
         time.sleep(duration)
@@ -121,7 +121,7 @@ def get_sensor_readings(seconds_since_last):
     config.moisture_target_c
   ]
 
-  water(moisture_levels, targets) # run pumps if needed
+  watered_amounts = water(moisture_levels=moisture_levels, targets=targets, auto_water=config.auto_water) # run pumps if needed
 
   from ucollections import OrderedDict
 
@@ -136,12 +136,12 @@ def get_sensor_readings(seconds_since_last):
     "moisture_target_a": config.moisture_target_a,
     "moisture_target_b": config.moisture_target_b,
     "moisture_target_c": config.moisture_target_c,
-    "watered_a": False,
-    "watered_b": False,
-    "watered_c": False,
-    "watered_duration_a": 0,
-    "watered_duration_b": 0,
-    "watered_duration_c": 0,
+    "watered_a": watered_amounts["A"]["status"],
+    "watered_b": watered_amounts["B"]["status"],
+    "watered_c": watered_amounts["C"]["status"],
+    "watered_duration_a": watered_amounts["A"]["duration"],
+    "watered_duration_b": watered_amounts["B"]["duration"],
+    "watered_duration_c": watered_amounts["C"]["duration"],
     "seconds_since_last": seconds_since_last,
   })
 
