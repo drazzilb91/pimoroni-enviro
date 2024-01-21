@@ -72,13 +72,8 @@ def drip_noise():
       time.sleep(0.02)
   piezo_pwm.duty_u16(0)
 
-def water(moisture_levels):
-  from enviro import config
-  targets = [
-    config.moisture_target_a, 
-    config.moisture_target_b,
-    config.moisture_target_c
-  ]
+def water(moisture_levels, targets = [0, 0, 0]):
+
 
   for i in range(0, 3):
     if moisture_levels[i] < targets[i]:
@@ -109,7 +104,15 @@ def get_sensor_readings(seconds_since_last):
 
   moisture_levels = moisture_readings()
 
-  water(moisture_levels) # run pumps if needed
+  # Moved this import here to allow for us to log the moisture targets. Future: This will allow us to pick up changes to the config when viewing data in Grafana.
+  from enviro import config
+  targets = [
+    config.moisture_target_a, 
+    config.moisture_target_b,
+    config.moisture_target_c
+  ]
+
+  water(moisture_levels, targets) # run pumps if needed
 
   from ucollections import OrderedDict
 
@@ -120,7 +123,10 @@ def get_sensor_readings(seconds_since_last):
     "luminance": round(ltr_data[BreakoutLTR559.LUX], 2),
     "moisture_a": round(moisture_levels[0], 2),
     "moisture_b": round(moisture_levels[1], 2),
-    "moisture_c": round(moisture_levels[2], 2)
+    "moisture_c": round(moisture_levels[2], 2),
+    "moisture_target_a": config.moisture_target_a,
+    "moisture_target_b": config.moisture_target_b,
+    "moisture_target_c": config.moisture_target_c,
   })
 
   return reading_payload
