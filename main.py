@@ -20,7 +20,7 @@
 #   - the Pimoroni pirate crew
 
 # uncomment the below two lines to change the amount of logging enviro will do
-# from phew import logging
+from phew import logging
 # logging.disable_logging_types(logging.LOG_DEBUG)
 
 # Issue #117 where neeed to sleep on startup otherwis emight not boot
@@ -39,7 +39,7 @@ print(RTC().datetime())
 
 try:
   # initialise enviro
-  enviro.startup()
+  # enviro.startup()
 
   # chirp = enviro.boards.grow.drip_noise()
 
@@ -77,7 +77,9 @@ try:
   # TODO should the board auto take a reading when the timer has been set, or wait for the time?
   # take a reading from the onboard sensors
   enviro.logging.debug(f"> taking new reading")
-  reading = enviro.get_sensor_readings()
+  # reading = enviro.get_sensor_readings()
+  # initialise enviro
+  enviro.startup()
 
   # here you can customise the sensor readings by adding extra information
   # or removing readings that you don't want, for example:
@@ -88,9 +90,16 @@ try:
 
   # is an upload destination set?
   if enviro.config.destination:
-    # if so cache this reading for upload later
-    enviro.logging.debug(f"> caching reading for upload")
-    enviro.cache_upload(reading)
+
+    # if the clock isn't set...
+    if enviro.is_clock_set():
+        # Only cache if the clock is set. if so cache this reading for upload later
+        enviro.logging.debug(f"> caching reading for upload")
+        enviro.cache_upload(reading)
+    else:
+      enviro.logging.info("> clock not set, discarding reading")
+      
+
 
     # if we have enough cached uploads...
     if enviro.is_upload_needed():
@@ -102,6 +111,7 @@ try:
   else:
     # otherwise save reading to local csv file (look in "/readings")
     enviro.logging.debug(f"> saving reading locally")
+    print(f"Saving reading at main.py line 112")
     enviro.save_reading(reading)
 
   # go to sleep until our next scheduled reading
