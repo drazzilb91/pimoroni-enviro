@@ -41,7 +41,7 @@ try:
   # initialise enviro
   enviro.startup()
 
-
+  # chirp = enviro.boards.grow.drip_noise()
 
   # if the clock isn't set...
   if not enviro.is_clock_set():
@@ -49,6 +49,8 @@ try:
     if not enviro.sync_clock_from_ntp():
       # failed to talk to ntp server go back to sleep for another cycle
       enviro.logging.error("! failed to synchronise clock")  
+      # chirp()
+      enviro.boards.grow.drip_noise()
 
   # check disk space...
   if enviro.low_disk_space():
