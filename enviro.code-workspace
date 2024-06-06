@@ -16,7 +16,11 @@
 			".vscode\\Pico-W-Stub"
 		],
 		"python.analysis.extraPaths": [
-			".vscode\\Pico-W-Stub\\stubs"
+			".vscode\\Pico-W-Stub\\stubs",
+			"lib"
+		],
+		"python.autoComplete.extraPaths": [
+			"lib"
 		]
 	}
 }
