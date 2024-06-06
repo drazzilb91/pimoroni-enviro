@@ -1,5 +1,5 @@
 import time
-from machine import Pin, ADC, UART
+from machine import Pin, ADC, UART, WDT
 from picographics import PicoGraphics, DISPLAY_ENVIRO_PLUS
 from pimoroni import RGBLED, Button
 from breakout_bme68x import BreakoutBME68X, STATUS_HEATER_STABLE
@@ -11,20 +11,32 @@ import WIFI_CONFIG
 from network_manager import NetworkManager
 import uasyncio
 
+import gc
+
 """
 This example reads from all the sensors on Enviro+.
 (plus the optional particulate sensor)
 Posts results via MQTT.
 """
 
+# Print the amount of free memory available on the board
+print(gc.mem_free())
+print("Beginning with a garbage collection")
+gc.collect()
+print(gc.mem_free())
+
+# Set up the watchdog timer
+# wdt = WDT(timeout=8000)
+# wdt.feed()
+
 # change this to adjust temperature compensation
 TEMPERATURE_OFFSET = 3
 
 # MQTT broker settings
 CLIENT_ID = "EnviroPlus"
-SERVER_ADDRESS = "broker_IP_goes_here"
-MQTT_USERNAME = "broker_username_goes_here"
-MQTT_PASSWORD = "broker_password_goes_here"
+SERVER_ADDRESS = "10.225.11.218"
+MQTT_USERNAME = "mqtt"
+MQTT_PASSWORD = "s75Ve7LqJtqs2paeBw68"
 UPDATE_INTERVAL = 60  # how often to post MQTT data, in seconds
 
 
@@ -59,6 +71,7 @@ led.set_rgb(255, 0, 0)
 # set up the buttons
 button_a = Button(12, invert=True)
 button_b = Button(13, invert=True)
+button_x = Button(14 , invert=True)
 
 # set up the Pico W's I2C
 PINS_BREAKOUT_GARDEN = {"sda": 4, "scl": 5}
@@ -101,10 +114,13 @@ e = "Wait a minute"
 uasyncio.get_event_loop().run_until_complete(network_manager.client(WIFI_CONFIG.SSID, WIFI_CONFIG.PSK))
 
 while True:
+    wdt.feed() # feed the watchdog timer
 
     # read BME688
     temperature, pressure, humidity, gas, status, _, _ = bme.read()
     heater = "Stable" if status & STATUS_HEATER_STABLE else "Unstable"
+
+    wdt.feed() # feed the watchdog timer
 
     # correct temperature and humidity using an offset
     corrected_temperature = temperature - TEMPERATURE_OFFSET
@@ -116,11 +132,19 @@ while True:
     lux = ltr_reading[BreakoutLTR559.LUX]
     prox = ltr_reading[BreakoutLTR559.PROXIMITY]
 
+    wdt.feed() # feed the watchdog timer
+
     # read mic
     mic_reading = mic.read_u16()
 
+    wdt.feed() # feed the watchdog timer
+
     # read particle sensor
     particulate_reading = pms5003.read()
+    print(particulate_reading)
+
+    wdt.feed() # feed the watchdog timer
+
 
     if heater == "Stable" and ltr_reading is not None:
         led.set_rgb(0, 0, 0)
@@ -129,15 +153,28 @@ while True:
             # then do an MQTT
             try:
                 mqtt_client.connect()
-                mqtt_client.publish(topic="EnviroTemperature", msg=str(corrected_temperature))
-                mqtt_client.publish(topic="EnviroHumidity", msg=str(corrected_humidity))
-                mqtt_client.publish(topic="EnviroPressure", msg=str(pressure / 100))
-                mqtt_client.publish(topic="EnviroGas", msg=str(gas))
-                mqtt_client.publish(topic="EnviroLux", msg=str(lux))
-                mqtt_client.publish(topic="EnviroMic", msg=str(mic_reading))
-                mqtt_client.publish(topic="EnviroParticulates1_0", msg=str(particulate_reading.pm_ug_per_m3(1.0)))
-                mqtt_client.publish(topic="EnviroParticulates2_5", msg=str(particulate_reading.pm_ug_per_m3(2.5)))
-                mqtt_client.publish(topic="EnviroParticulates10", msg=str(particulate_reading.pm_ug_per_m3(10)))
+
+                wdt.feed() # feed the watchdog timer
+
+                mqtt_client.publish(topic="EnviroPlus/Temperature", msg=str(corrected_temperature))
+                mqtt_client.publish(topic="EnviroPlus/Humidity", msg=str(corrected_humidity))
+                mqtt_client.publish(topic="EnviroPlus/Pressure", msg=str(pressure / 100))
+                mqtt_client.publish(topic="EnviroPlus/Gas", msg=str(gas))
+                mqtt_client.publish(topic="EnviroPlus/Lux", msg=str(lux))
+                mqtt_client.publish(topic="EnviroPlus/Mic", msg=str(mic_reading))
+                mqtt_client.publish(topic="EnviroPlus/Particulates/1_0", msg=str(particulate_reading.pm_ug_per_m3(1.0)))
+                mqtt_client.publish(topic="EnviroPlus/Particulates/2_5", msg=str(particulate_reading.pm_ug_per_m3(2.5)))
+                mqtt_client.publish(topic="EnviroPlus/Particulates/10", msg=str(particulate_reading.pm_ug_per_m3(10)))
+                mqtt_client.publish(topic="EnviroPlus/Particulates/1_0_atmos", msg=str(particulate_reading.pm_ug_per_m3(1.0, True)))
+                mqtt_client.publish(topic="EnviroPlus/Particulates/2_5_atmos", msg=str(particulate_reading.pm_ug_per_m3(2.5, True)))
+                mqtt_client.publish(topic="EnviroPlus/Particulates/10_atmos", msg=str(particulate_reading.pm_ug_per_m3(10, True)))
+
+                mqtt_client.publish(topic="EnviroPlus/Particulates/0_3_per_1l_air", msg=str(particulate_reading.pm_per_1l_air(0.3)))
+                mqtt_client.publish(topic="EnviroPlus/Particulates/0_5_per_1l_air", msg=str(particulate_reading.pm_per_1l_air(0.5)))
+                mqtt_client.publish(topic="EnviroPlus/Particulates/1_0_per_1l_air", msg=str(particulate_reading.pm_per_1l_air(1.0)))
+                mqtt_client.publish(topic="EnviroPlus/Particulates/2_5_per_1l_air", msg=str(particulate_reading.pm_per_1l_air(2.5)))
+                mqtt_client.publish(topic="EnviroPlus/Particulates/5_0_per_1l_air", msg=str(particulate_reading.pm_per_1l_air(5.0)))
+                mqtt_client.publish(topic="EnviroPlus/Particulates/10_per_1l_air", msg=str(particulate_reading.pm_per_1l_air(10)))
                 mqtt_client.disconnect()
                 mqtt_success = True
                 mqtt_time = time.ticks_ms()
@@ -150,6 +187,8 @@ while True:
         # light up the LED red if there's a problem with MQTT or sensor readings
         led.set_rgb(255, 0, 0)
 
+    wdt.feed() # feed the watchdog timer
+
     # turn off the backlight with A and turn it back on with B
     # things run a bit hotter when screen is on, so we're applying a different temperature offset
     if button_a.is_pressed:
@@ -160,6 +199,12 @@ while True:
         display.set_backlight(0)
         TEMPERATURE_OFFSET = 3
         time.sleep(0.5)
+    elif button_x.is_pressed:
+        print("Exiting")
+        display.clear()
+        display.set_pen(WHITE)
+        display.text("Exiting", 10, 10, WIDTH, scale=3)
+        exit(0)
 
     # draw some stuff on the screen
     display.set_pen(BLACK)
@@ -175,4 +220,6 @@ while True:
         display.text(e, 10, 130, WIDTH, scale=3)
     display.update()
 
+    wdt.feed() # feed the watchdog timer
+    
     time.sleep(1.0)

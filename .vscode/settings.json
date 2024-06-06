@@ -4,11 +4,14 @@
     "python.analysis.typeCheckingMode": "basic",
     "micropico.syncFolder": "",
     "python.analysis.typeshedPaths": [
-        ".vscode\\Pico-W-Stub"
+        "~\\.micropico-stubs\\included",
+        "~\\.micropico-stubs\\included",
+        "~\\.micropico-stubs\\included"
     ],
     "python.analysis.extraPaths": [
-        ".vscode\\Pico-W-Stub\\stubs",
-        ".vscode\\Pico-W-Stub"
+        "~\\.micropico-stubs\\included",
+        "~\\.micropico-stubs\\included",
+        "~\\.micropico-stubs\\included"
     ],
     "micropico.openOnStart": true,
     "python.analysis.diagnosticSeverityOverrides": {
